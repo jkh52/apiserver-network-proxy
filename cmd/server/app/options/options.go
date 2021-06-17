@@ -38,7 +38,7 @@ type ProxyRunOptions struct {
 	HealthPort uint
 	// After a duration of this time if the server doesn't see any activity it
 	// pings the client to see if the transport is still alive.
-	KeepaliveTime       time.Duration
+	KeepaliveTime         time.Duration
 	FrontendKeepaliveTime time.Duration
 	// Enables pprof at host:AdminPort/debug/pprof.
 	EnableProfiling bool

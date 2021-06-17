@@ -2,6 +2,7 @@ package tests
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -21,7 +22,7 @@ func TestProxy_Agent_Disconnect_HTTP_Persistent_Connection(t *testing.T) {
 	testcases := []struct {
 		name                string
 		proxyServerFunction func() (proxy, func(), error)
-		clientFunction      func(string, string) (*http.Client, error)
+		clientFunction      func(context.Context, string, string) (*http.Client, error)
 	}{
 		{
 			name:                "grpc",
@@ -59,7 +60,7 @@ func TestProxy_Agent_Disconnect_HTTP_Persistent_Connection(t *testing.T) {
 
 			// run test client
 
-			c, err := tc.clientFunction(proxy.front, server.URL)
+			c, err := tc.clientFunction(context.Background(), proxy.front, server.URL)
 			if err != nil {
 				t.Errorf("error obtaining client: %v", err)
 			}
@@ -92,7 +93,7 @@ func TestProxy_Agent_Reconnect(t *testing.T) {
 	testcases := []struct {
 		name                string
 		proxyServerFunction func() (proxy, func(), error)
-		clientFunction      func(string, string) (*http.Client, error)
+		clientFunction      func(context.Context, string, string) (*http.Client, error)
 	}{
 		{
 			name:                "grpc",
@@ -130,7 +131,7 @@ func TestProxy_Agent_Reconnect(t *testing.T) {
 
 			// run test client
 
-			c, err := tc.clientFunction(proxy.front, server.URL)
+			c, err := tc.clientFunction(context.Background(), proxy.front, server.URL)
 			if err != nil {
 				t.Errorf("error obtaining client: %v", err)
 			}
@@ -159,7 +160,7 @@ func TestProxy_Agent_Reconnect(t *testing.T) {
 			})
 
 			// Proxy requests should work again after agent reconnects
-			c2, err := tc.clientFunction(proxy.front, server.URL)
+			c2, err := tc.clientFunction(context.Background(), proxy.front, server.URL)
 			if err != nil {
 				t.Errorf("error obtaining client: %v", err)
 			}
@@ -190,8 +191,8 @@ func clientRequest(c *http.Client, addr string) ([]byte, error) {
 	return data, nil
 }
 
-func createGrpcTunnelClient(proxyAddr, addr string) (*http.Client, error) {
-	tunnel, err := client.CreateSingleUseGrpcTunnel(proxyAddr, grpc.WithInsecure())
+func createGrpcTunnelClient(ctx context.Context, proxyAddr, addr string) (*http.Client, error) {
+	tunnel, err := client.CreateSingleUseGrpcTunnel(ctx, proxyAddr, grpc.WithInsecure())
 	if err != nil {
 		return nil, err
 	}
@@ -199,14 +200,14 @@ func createGrpcTunnelClient(proxyAddr, addr string) (*http.Client, error) {
 	c := &http.Client{
 		Timeout: 10 * time.Second,
 		Transport: &http.Transport{
-			Dial: tunnel.Dial,
+			DialContext: tunnel.DialContext,
 		},
 	}
 
 	return c, nil
 }
 
-func createHTTPConnectClient(proxyAddr, addr string) (*http.Client, error) {
+func createHTTPConnectClient(ctx context.Context, proxyAddr, addr string) (*http.Client, error) {
 	conn, err := net.Dial("tcp", proxyAddr)
 	if err != nil {
 		return nil, err

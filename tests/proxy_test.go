@@ -73,14 +73,14 @@ func TestBasicProxy_GRPC(t *testing.T) {
 	time.Sleep(time.Second)
 
 	// run test client
-	tunnel, err := client.CreateSingleUseGrpcTunnel(proxy.front, grpc.WithInsecure())
+	tunnel, err := client.CreateSingleUseGrpcTunnel(context.Background(), proxy.front, grpc.WithInsecure())
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	c := &http.Client{
 		Transport: &http.Transport{
-			Dial: tunnel.Dial,
+			DialContext: tunnel.DialContext,
 		},
 	}
 
@@ -117,14 +117,14 @@ func TestProxyHandleDialError_GRPC(t *testing.T) {
 	time.Sleep(time.Second)
 
 	// run test client
-	tunnel, err := client.CreateSingleUseGrpcTunnel(proxy.front, grpc.WithInsecure())
+	tunnel, err := client.CreateSingleUseGrpcTunnel(context.Background(), proxy.front, grpc.WithInsecure())
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	c := &http.Client{
 		Transport: &http.Transport{
-			Dial: tunnel.Dial,
+			DialContext: tunnel.DialContext,
 		},
 	}
 
@@ -134,6 +134,83 @@ func TestProxyHandleDialError_GRPC(t *testing.T) {
 	_, err = c.Get(url)
 	if err == nil || !strings.Contains(err.Error(), "connection refused") {
 		t.Error("Expected error when destination is unreachable, did not receive error")
+	}
+}
+
+func TestProxyHandle_DoneContext_GRPC(t *testing.T) {
+	hangingServer := newEchoServer("hello")
+	hangingServer.wchan = make(chan struct{})
+	server := httptest.NewServer(hangingServer)
+	defer server.Close()
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	proxy, cleanup, err := runGRPCProxyServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+
+	runAgent(proxy.agent, stopCh)
+
+	// Wait for agent to register on proxy server
+	time.Sleep(time.Second)
+
+	// run test client
+	ctx, _ := context.WithTimeout(context.Background(), -time.Second)
+	_, err = client.CreateSingleUseGrpcTunnel(ctx, proxy.front, grpc.WithInsecure())
+	if err == nil || !strings.Contains(err.Error(), "context deadline exceeded") {
+		t.Error("Expected error when context is cancelled, did not receive error")
+	}
+}
+
+func TestProxyHandle_SlowContext_GRPC(t *testing.T) {
+	slowServer := newEchoServer("hello")
+	slowServer.wchan = make(chan struct{})
+	server := httptest.NewServer(slowServer)
+	defer server.Close()
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	proxy, cleanup, err := runGRPCProxyServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+
+	runAgent(proxy.agent, stopCh)
+
+	// Wait for agent to register on proxy server
+	time.Sleep(time.Second)
+
+	// run test client
+	ctx, _ := context.WithTimeout(context.Background(), time.Second)
+	tunnel, err := client.CreateSingleUseGrpcTunnel(ctx, proxy.front, grpc.WithInsecure())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	go func() {
+		time.Sleep(3 * time.Second)
+		close(slowServer.wchan)
+	}()
+
+	c := &http.Client{
+		Transport: &http.Transport{
+			DialContext: tunnel.DialContext,
+		},
+	}
+
+	r, err := c.Get(server.URL)
+	if err != nil {
+		t.Error(err)
+	}
+
+	_, err = ioutil.ReadAll(r.Body)
+	if err == nil || !strings.Contains(err.Error(), "context deadline exceeded") {
+		t.Error("Expected error when context is cancelled, did not receive error")
 	}
 }
 
@@ -158,14 +235,14 @@ func TestProxy_LargeResponse(t *testing.T) {
 	time.Sleep(time.Second)
 
 	// run test client
-	tunnel, err := client.CreateSingleUseGrpcTunnel(proxy.front, grpc.WithInsecure())
+	tunnel, err := client.CreateSingleUseGrpcTunnel(context.Background(), proxy.front, grpc.WithInsecure())
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	c := &http.Client{
 		Transport: &http.Transport{
-			Dial: tunnel.Dial,
+			DialContext: tunnel.DialContext,
 		},
 	}
 
