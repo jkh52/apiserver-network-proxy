@@ -203,12 +203,23 @@ func TestProxyHandle_SlowContext_GRPC(t *testing.T) {
 		},
 	}
 
+	/* TODO: handle case where there is no context on the request.
 	r, err := c.Get(server.URL)
 	if err != nil {
 		t.Error(err)
 	}
 
 	_, err = ioutil.ReadAll(r.Body)
+	if err == nil || !strings.Contains(err.Error(), "context deadline exceeded") {
+		t.Error("Expected error when context is cancelled, did not receive error")
+	}
+	*/
+
+	req, err := http.NewRequestWithContext(ctx, "GET", server.URL, nil)
+	if err != nil {
+		t.Error(err)
+	}
+	_, err = c.Do(req)
 	if err == nil || !strings.Contains(err.Error(), "context deadline exceeded") {
 		t.Error("Expected error when context is cancelled, did not receive error")
 	}
