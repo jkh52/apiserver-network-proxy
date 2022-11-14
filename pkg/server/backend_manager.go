@@ -25,6 +25,8 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
+
+	sharedmetrics "sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/shared/metrics"
 	client "sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client"
 	pkgagent "sigs.k8s.io/apiserver-network-proxy/pkg/agent"
 	"sigs.k8s.io/apiserver-network-proxy/pkg/server/metrics"
@@ -85,7 +87,12 @@ type backend struct {
 func (b *backend) Send(p *client.Packet) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return b.conn.Send(p)
+	metrics.Metrics.ObservePacket(sharedmetrics.SegmentToBackend, p.Type)
+	err := b.conn.Send(p)
+	if err != nil {
+		metrics.Metrics.ObserveStreamError(sharedmetrics.SegmentToBackend, err, p.Type)
+	}
+	return err
 }
 
 func (b *backend) Context() context.Context {

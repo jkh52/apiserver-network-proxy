@@ -29,6 +29,9 @@ import (
 
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
+
+	"sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client/metrics"
+	sharedmetrics "sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/shared/metrics"
 	"sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client"
 )
 
@@ -188,6 +191,9 @@ func newUnstartedTunnel(stream client.ProxyService_ProxyClient, c clientConn) *g
 }
 
 func (t *grpcTunnel) serve(tunnelCtx context.Context) {
+	metrics.Metrics.TunnelConnectionsInc()
+	defer metrics.Metrics.TunnelConnectionsDec()
+
 	defer func() {
 		t.clientConn.Close()
 
@@ -201,14 +207,18 @@ func (t *grpcTunnel) serve(tunnelCtx context.Context) {
 
 	for {
 		pkt, err := t.stream.Recv()
-		if err == io.EOF || t.isClosing() {
+		if err == io.EOF {
 			return
 		}
 		if err != nil || pkt == nil {
 			klog.ErrorS(err, "stream read failure")
+			metrics.Metrics.ObserveStreamErrorNoPacket(sharedmetrics.SegmentToFrontend, err)
 			return
 		}
-
+		metrics.Metrics.ObservePacket(sharedmetrics.SegmentToFrontend, pkt.Type)
+		if t.isClosing() {
+			return
+		}
 		klog.V(5).InfoS("[tracing] recv packet", "type", pkt.Type)
 
 		switch pkt.Type {
