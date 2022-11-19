@@ -278,7 +278,6 @@ func (s *ProxyServer) removeBackend(agentID string, conn agent.AgentService_Conn
 }
 
 func (s *ProxyServer) addFrontend(agentID string, connID int64, p *ProxyClientConnection) {
-	klog.V(2).InfoS("Register frontend for agent", "frontend", p, "agentID", agentID, "connectionID", connID)
 	s.fmu.Lock()
 	defer s.fmu.Unlock()
 	if _, ok := s.frontends[agentID]; !ok {
@@ -299,12 +298,10 @@ func (s *ProxyServer) removeFrontend(agentID string, connID int64) {
 		klog.V(2).InfoS("Cannot find connection for agent in the frontends", "connectionID", connID, "agentID", agentID)
 		return
 	}
-	klog.V(2).InfoS("Remove frontend for agent", "frontend", conns[connID], "agentID", agentID, "connectionID", connID)
 	delete(s.frontends[agentID], connID)
 	if len(s.frontends[agentID]) == 0 {
 		delete(s.frontends, agentID)
 	}
-	return
 }
 
 func (s *ProxyServer) getFrontend(agentID string, connID int64) (*ProxyClientConnection, error) {
@@ -376,7 +373,7 @@ func (s *ProxyServer) Proxy(stream client.ProxyService_ProxyServer) error {
 		return fmt.Errorf("failed to get context")
 	}
 	userAgent := md.Get(header.UserAgent)
-	klog.V(2).InfoS("Proxy request from client", "userAgent", userAgent, "serverID", s.serverID)
+	klog.V(5).InfoS("Proxy request from client", "userAgent", userAgent, "serverID", s.serverID)
 
 	recvCh := make(chan *client.Packet, xfrChannelSize)
 	stopCh := make(chan error)
@@ -388,7 +385,6 @@ func (s *ProxyServer) Proxy(stream client.ProxyService_ProxyServer) error {
 	go runpprof.Do(context.Background(), labels, func(context.Context) { s.serveRecvFrontend(stream, recvCh) })
 
 	defer func() {
-		klog.V(2).InfoS("Receive channel from frontend is stopping", "userAgent", userAgent)
 		close(recvCh)
 	}()
 
@@ -402,6 +398,7 @@ func (s *ProxyServer) readFrontendToChannel(stream client.ProxyService_ProxyServ
 	for {
 		in, err := stream.Recv()
 		if err == io.EOF {
+			// TODO: Log an error if the frontend connection stops without first closing any open connections.
 			klog.V(2).InfoS("Receive stream from frontend closed", "userAgent", userAgent)
 			close(stopCh)
 			return
@@ -542,6 +539,7 @@ func (s *ProxyServer) serveRecvFrontend(stream client.ProxyService_ProxyServer, 
 		}
 	}
 
+	// TODO: Log an error if the frontend stream is closed with an established tunnel still open.
 	klog.V(5).InfoS("Close streaming", "connectionID", firstConnID)
 
 	if backend == nil {
@@ -665,7 +663,7 @@ func (s *ProxyServer) authenticateAgentViaToken(ctx context.Context) error {
 		return fmt.Errorf("Failed to validate authentication token, err:%v", err)
 	}
 
-	klog.V(2).InfoS("Agent successfully authenticated via token", "username", username)
+	klog.V(5).InfoS("Agent successfully authenticated via token", "username", username)
 	return nil
 }
 
@@ -679,7 +677,7 @@ func (s *ProxyServer) Connect(stream agent.AgentService_ConnectServer) error {
 		return err
 	}
 
-	klog.V(2).InfoS("Connect request from agent", "agentID", agentID, "serverID", s.serverID)
+	klog.V(5).InfoS("Connect request from agent", "agentID", agentID, "serverID", s.serverID)
 	labels := runpprof.Labels(
 		"serverCount", strconv.Itoa(s.serverCount),
 		"agentID", agentID,
@@ -700,6 +698,7 @@ func (s *ProxyServer) Connect(stream agent.AgentService_ConnectServer) error {
 		return err
 	}
 
+	klog.V(2).InfoS("Agent connected", "agentID", agentID, "serverID", s.serverID)
 	backend := s.addBackend(agentID, stream)
 	defer s.removeBackend(agentID, stream)
 
@@ -708,7 +707,6 @@ func (s *ProxyServer) Connect(stream agent.AgentService_ConnectServer) error {
 	go runpprof.Do(context.Background(), labels, func(context.Context) { s.serveRecvBackend(backend, stream, agentID, recvCh) })
 
 	defer func() {
-		klog.V(2).InfoS("Receive channel from agent is stopping", "agentID", agentID)
 		close(recvCh)
 	}()
 
