@@ -38,10 +38,11 @@ var (
 
 // ClientMetrics includes all the metrics of the konnectivity-client.
 type ClientMetrics struct {
-	registerOnce  sync.Once
-	streamPackets *prometheus.CounterVec
-	streamErrors  *prometheus.CounterVec
-	dialFailures  *prometheus.CounterVec
+	registerOnce    sync.Once
+	streamPackets   *prometheus.CounterVec
+	streamErrors    *prometheus.CounterVec
+	dialFailures    *prometheus.CounterVec
+	grpcConnections *prometheus.GaugeVec
 }
 
 type DialFailureReason string
@@ -79,6 +80,17 @@ func newMetrics() *ClientMetrics {
 			"reason",
 		},
 	)
+	grpcConnections := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: Namespace,
+			Subsystem: Subsystem,
+			Name:      "grpc_connections",
+			Help:      "Number of current grpc connections, partitioned by service method.",
+		},
+		[]string{
+			"service_method",
+		},
+	)
 	return &ClientMetrics{
 		streamPackets: commonmetrics.MakeStreamPacketsTotalMetric(Namespace, Subsystem),
 		streamErrors:  commonmetrics.MakeStreamErrorsTotalMetric(Namespace, Subsystem),
@@ -92,6 +104,7 @@ func (c *ClientMetrics) RegisterMetrics(r prometheus.Registerer) {
 		r.MustRegister(c.streamPackets)
 		r.MustRegister(c.streamErrors)
 		r.MustRegister(c.dialFailures)
+		r.MustRegister(c.grpcConnections)
 	})
 }
 
@@ -102,6 +115,7 @@ func (c *ClientMetrics) LegacyRegisterMetrics(mustRegisterFn func(...prometheus.
 		mustRegisterFn(c.streamPackets)
 		mustRegisterFn(c.streamErrors)
 		mustRegisterFn(c.dialFailures)
+		mustRegisterFn(c.grpcConnections)
 	})
 }
 
@@ -110,10 +124,19 @@ func (c *ClientMetrics) Reset() {
 	c.streamPackets.Reset()
 	c.streamErrors.Reset()
 	c.dialFailures.Reset()
+	c.grpcConnections.Reset()
 }
 
 func (c *ClientMetrics) ObserveDialFailure(reason DialFailureReason) {
 	c.dialFailures.WithLabelValues(string(reason)).Inc()
+}
+
+func (s *ServerMetrics) GrpcConnectionInc(serviceMethod string) {
+	s.grpcConnections.With(prometheus.Labels{"service_method": serviceMethod}).Inc()
+}
+
+func (s *ServerMetrics) GrpcConnectionDec(serviceMethod string) {
+	s.grpcConnections.With(prometheus.Labels{"service_method": serviceMethod}).Dec()
 }
 
 func (c *ClientMetrics) ObservePacket(segment commonmetrics.Segment, packetType client.PacketType) {
