@@ -1,8 +1,15 @@
-# apiserver-network-proxy
+# apiserver-network-proxy (a.k.a. Konnectivity Proxy)
 
-Created due to https://github.com/kubernetes/org/issues/715.
+Konnectivity Proxy (a.k.a. apiserver-network-proxy) is a forward proxy used by Kube API server to egress to the cluster network.
 
-See [the KEP proposal for architecture and details](https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/1281-network-proxy#proposal).
+## Components
+
+- **Control Plane Network** An IP reachable network space containing control plane components (Kubernetes API Server, `konnectivity-server`, `etcd-server`, etc.)
+
+## History
+
+- https://github.com/kubernetes/org/issues/715.
+- [KEP proposal](https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/1281-network-proxy#proposal).
 
 ## Community, discussion, contribution, and support
 
