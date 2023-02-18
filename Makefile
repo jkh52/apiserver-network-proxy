@@ -48,11 +48,22 @@ PROXY_SERVER_IP ?= 127.0.0.1
 ## --------------------------------------
 ## Testing
 ## --------------------------------------
-mock_gen:
+.PHONY: mock_gen
+mock_gen: mock_gen_agent mock_gen_client
+
+.PHONY: mock_gen_agent
+mock_gen_agent: proto/agent/agent_grpc.pb.go
 	mkdir -p proto/agent/mocks
 	mockgen sigs.k8s.io/apiserver-network-proxy/proto/agent AgentService_ConnectServer > proto/agent/mocks/agent_mock.go
 	cat hack/go-license-header.txt proto/agent/mocks/agent_mock.go > proto/agent/mocks/agent_mock.licensed.go
 	mv proto/agent/mocks/agent_mock.licensed.go proto/agent/mocks/agent_mock.go
+
+.PHONY: mock_gen_client
+mock_gen_client: ./konnectivity-client/proto/client/client_grpc.pb.go
+	mkdir -p konnectivity-client/proto/client/mocks
+	mockgen sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client ProxyService_ProxyServer > konnectivity-client/proto/client/mocks/client_mock.go
+	cat hack/go-license-header.txt konnectivity-client/proto/client/mocks/client_mock.go > konnectivity-client/proto/client/mocks/client_mock.licensed.go
+	mv konnectivity-client/proto/client/mocks/client_mock.licensed.go konnectivity-client/proto/client/mocks/client_mock.go
 
 .PHONY: test
 test:

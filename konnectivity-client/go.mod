@@ -5,6 +5,7 @@ go 1.17
 // Prefer to keep requirements compatible with the oldest supported
 // k/k minor version, to prevent client backport issues.
 require (
+	github.com/golang/mock v1.6.0
 	github.com/prometheus/client_golang v1.0.0
 	go.uber.org/goleak v1.2.0
 	google.golang.org/grpc v1.40.0
