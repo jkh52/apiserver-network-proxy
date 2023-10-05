@@ -19,7 +19,6 @@ package options
 import (
 	"fmt"
 	"net"
-	"net/url"
 	"os"
 	"strconv"
 	"time"
@@ -188,27 +187,8 @@ func (o *GrpcProxyAgentOptions) Validate() error {
 			return fmt.Errorf("error checking service account token path %s, got %v", o.ServiceAccountTokenPath, err)
 		}
 	}
-	if err := validateAgentIdentifiers(o.AgentIdentifiers); err != nil {
-		return fmt.Errorf("agent address is invalid: %v", err)
-	}
-	return nil
-}
-
-func validateAgentIdentifiers(agentIdentifiers string) error {
-	decoded, err := url.ParseQuery(agentIdentifiers)
-	if err != nil {
-		return err
-	}
-	for idType := range decoded {
-		switch header.IdentifierType(idType) {
-		case header.IPv4:
-		case header.IPv6:
-		case header.CIDR:
-		case header.Host:
-		case header.DefaultRoute:
-		default:
-			return fmt.Errorf("unknown address type: %s", idType)
-		}
+	if err := header.ValidateAgentIdentifiers(o.AgentIdentifiers); err != nil {
+		return fmt.Errorf("agent identifiers are invalid: %v", err)
 	}
 	return nil
 }

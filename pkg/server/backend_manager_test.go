@@ -167,11 +167,11 @@ func TestAddRemoveBackendsWithDefaultRouteStrategy(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	backend1, _ := NewBackend(mockAgentConn(ctrl, "agent1", []string{"default-route"}))
-	backend12, _ := NewBackend(mockAgentConn(ctrl, "agent1", []string{"default-route"}))
-	backend2, _ := NewBackend(mockAgentConn(ctrl, "agent2", []string{"default-route"}))
-	backend22, _ := NewBackend(mockAgentConn(ctrl, "agent2", []string{"default-route"}))
-	backend3, _ := NewBackend(mockAgentConn(ctrl, "agent3", []string{"default-route"}))
+	backend1, _ := NewBackend(mockAgentConn(ctrl, "agent1", []string{"default-route=true"}))
+	backend12, _ := NewBackend(mockAgentConn(ctrl, "agent1", []string{"default-route=true"}))
+	backend2, _ := NewBackend(mockAgentConn(ctrl, "agent2", []string{"default-route=true"}))
+	backend22, _ := NewBackend(mockAgentConn(ctrl, "agent2", []string{"default-route=true"}))
+	backend3, _ := NewBackend(mockAgentConn(ctrl, "agent3", []string{"default-route=true"}))
 
 	p := NewDefaultRouteBackendManager()
 

@@ -41,6 +41,7 @@ func TestDefaultServerOptions(t *testing.T) {
 	assertDefaultValue(t, "AdminServerPort", defaultAgentOptions.AdminServerPort, 8094)
 	assertDefaultValue(t, "EnableProfiling", defaultAgentOptions.EnableProfiling, false)
 	assertDefaultValue(t, "EnableContentionProfiling", defaultAgentOptions.EnableContentionProfiling, false)
+	assert.NotEmpty(t, defaultAgentOptions.AgentID)
 	assertDefaultValue(t, "AgentIdentifiers", defaultAgentOptions.AgentIdentifiers, "")
 	assertDefaultValue(t, "SyncInterval", defaultAgentOptions.SyncInterval, 1*time.Second)
 	assertDefaultValue(t, "ProbeInterval", defaultAgentOptions.ProbeInterval, 1*time.Second)
@@ -144,6 +145,16 @@ func TestValidate(t *testing.T) {
 				"EnableProfiling":           false,
 			},
 			expected: fmt.Errorf("if --enable-contention-profiling is set, --enable-profiling must also be set"),
+		},
+		"EmptyAgentID": {
+		},
+		"InvalidAgentID": {
+		}
+		"ValidAgentID": {
+		},
+		"InvalidAgentIdentifiers": {
+		},
+		"ValidAgentIdentifiers": {
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
