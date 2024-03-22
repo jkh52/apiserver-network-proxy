@@ -80,6 +80,8 @@ type Backend interface {
 	Send(p *client.Packet) error
 	Recv() (*client.Packet, error)
 	Context() context.Context
+
+	// AgentID and AgentIdentifiers are immutable.
 	GetAgentID() string
 	GetAgentIdentifiers() header.Identifiers
 }
@@ -182,10 +184,10 @@ func NewBackend(conn agent.AgentService_ConnectServer) (Backend, error) {
 // BackendStorage is an interface to manage the storage of the backend
 // connections, i.e., get, add and remove
 type BackendStorage interface {
-	// AddBackend adds a backend.
-	AddBackend(identifier string, idType header.IdentifierType, backend Backend)
-	// RemoveBackend removes a backend.
-	RemoveBackend(identifier string, idType header.IdentifierType, backend Backend)
+	// addBackend adds a backend.
+	addBackend(identifier string, idType header.IdentifierType, backend Backend)
+	// removeBackend removes a backend.
+	removeBackend(identifier string, idType header.IdentifierType, backend Backend)
 	// NumBackends returns the number of backends.
 	NumBackends() int
 }
@@ -199,6 +201,10 @@ type BackendManager interface {
 	// pick a backend for every tunnel session and each tunnel session may
 	// contains multiple requests.
 	Backend(ctx context.Context) (Backend, error)
+	// AddBackend adds a backend.
+	AddBackend(backend Backend)
+	// RemoveBackend adds a backend.
+	RemoveBackend(backend Backend)
 	BackendStorage
 	ReadinessManager
 }
@@ -215,22 +221,30 @@ func (dbm *DefaultBackendManager) Backend(_ context.Context) (Backend, error) {
 	return dbm.DefaultBackendStorage.GetRandomBackend()
 }
 
+func (dbm *DefaultBackendManager) AddBackend(backend Backend) {
+	agentID := backend.GetAgentID()
+	klog.V(5).InfoS("Add the agent to DefaultBackendManager", "agentID", agentID)
+	dbm.addBackend(agentID, header.UID, backend)
+}
+
+func (dbm *DefaultBackendManager) RemoveBackend(backend Backend) {
+	agentID := backend.GetAgentID()
+	klog.V(5).InfoS("Remove the agent from the DefaultBackendManager", "agentID", agentID)
+	dbm.removeBackend(agentID, header.UID, backend)
+}
+
 // DefaultBackendStorage is the default backend storage.
 type DefaultBackendStorage struct {
 	mu sync.RWMutex //protects the following
-	// A map between agentID and its grpc connections.
-	// For a given agent, ProxyServer prefers backends[agentID][0] to send
-	// traffic, because backends[agentID][1:] are more likely to be closed
+	// A map between agent identifier and its grpc connections.
+	// For a given agent, ProxyServer prefers backends[identifier][0] to send
+	// traffic, because backends[identifer][1:] are more likely to be closed
 	// by the agent to deduplicate connections to the same server.
 	backends map[string][]Backend
-	// agentID is tracked in this slice to enable randomly picking an
-	// agentID in the Backend() method. There is no reliable way to
-	// randomly pick a key from a map (in this case, the backends) in
-	// Golang.
-	agentIDs []string
-	// defaultRouteAgentIDs tracks the agents that have claimed the default route.
-	defaultRouteAgentIDs []string
-	random               *rand.Rand
+	// backendKeys is the set of keys in backends map for efficient random selection.
+	backendKeys []string
+
+	random *rand.Rand
 	// idTypes contains the valid identifier types for this
 	// DefaultBackendStorage. The DefaultBackendStorage may only tolerate certain
 	// types of identifiers when associating to a specific BackendManager,
@@ -267,8 +281,8 @@ func containIDType(idTypes []header.IdentifierType, idType header.IdentifierType
 	return false
 }
 
-// AddBackend adds a backend.
-func (s *DefaultBackendStorage) AddBackend(identifier string, idType header.IdentifierType, backend Backend) {
+// addBackend adds a backend by identifier type.
+func (s *DefaultBackendStorage) addBackend(identifier string, idType header.IdentifierType, backend Backend) {
 	if !containIDType(s.idTypes, idType) {
 		klog.V(4).InfoS("fail to add backend", "backend", identifier, "error", &ErrWrongIDType{idType, s.idTypes})
 		return
@@ -289,14 +303,11 @@ func (s *DefaultBackendStorage) AddBackend(identifier string, idType header.Iden
 	}
 	s.backends[identifier] = []Backend{backend}
 	metrics.Metrics.SetBackendCount(len(s.backends))
-	s.agentIDs = append(s.agentIDs, identifier)
-	if idType == header.DefaultRoute {
-		s.defaultRouteAgentIDs = append(s.defaultRouteAgentIDs, identifier)
-	}
+	s.backendKeys = append(s.backendKeys, identifier)
 }
 
-// RemoveBackend removes a backend.
-func (s *DefaultBackendStorage) RemoveBackend(identifier string, idType header.IdentifierType, backend Backend) {
+// removeBackend removes a backend by identifier type.
+func (s *DefaultBackendStorage) removeBackend(identifier string, idType header.IdentifierType, backend Backend) {
 	if !containIDType(s.idTypes, idType) {
 		klog.ErrorS(&ErrWrongIDType{idType, s.idTypes}, "fail to remove backend")
 		return
@@ -321,19 +332,11 @@ func (s *DefaultBackendStorage) RemoveBackend(identifier string, idType header.I
 	}
 	if len(s.backends[identifier]) == 0 {
 		delete(s.backends, identifier)
-		for i := range s.agentIDs {
-			if s.agentIDs[i] == identifier {
-				s.agentIDs[i] = s.agentIDs[len(s.agentIDs)-1]
-				s.agentIDs = s.agentIDs[:len(s.agentIDs)-1]
+		for i := range s.backendKeys {
+			if s.backendKeys[i] == identifier {
+				s.backendKeys[i] = s.backendKeys[len(s.backendKeys)-1]
+				s.backendKeys = s.backendKeys[:len(s.backendKeys)-1]
 				break
-			}
-		}
-		if idType == header.DefaultRoute {
-			for i := range s.defaultRouteAgentIDs {
-				if s.defaultRouteAgentIDs[i] == identifier {
-					s.defaultRouteAgentIDs = append(s.defaultRouteAgentIDs[:i], s.defaultRouteAgentIDs[i+1:]...)
-					break
-				}
 			}
 		}
 	}
@@ -381,9 +384,9 @@ func (s *DefaultBackendStorage) GetRandomBackend() (Backend, error) {
 	if len(s.backends) == 0 {
 		return nil, &ErrNotFound{}
 	}
-	agentID := s.agentIDs[s.random.Intn(len(s.agentIDs))]
-	klog.V(5).InfoS("Pick agent as backend", "agentID", agentID)
+	identifier := s.backendKeys[s.random.Intn(len(s.backendKeys))]
+	klog.V(5).InfoS("Pick agent as backend", "agentID", identifier)
 	// always return the first connection to an agent, because the agent
 	// will close later connections if there are multiple.
-	return s.backends[agentID][0], nil
+	return s.backends[identifier][0], nil
 }
