@@ -36,7 +36,6 @@ INSTALL_LOCATION:=$(shell go env GOPATH)/bin
 GOLANGCI_LINT_VERSION ?= 1.54.0
 GOSEC_VERSION ?= 2.13.1
 
-REGISTRY ?= gcr.io/$(shell gcloud config get-value project)
 STAGING_REGISTRY := gcr.io/k8s-staging-kas-network-proxy
 
 SERVER_IMAGE_NAME ?= proxy-server
@@ -44,10 +43,17 @@ AGENT_IMAGE_NAME ?= proxy-agent
 TEST_CLIENT_IMAGE_NAME ?= proxy-test-client
 TEST_SERVER_IMAGE_NAME ?= http-test-server
 
+ifdef REGISTRY
 SERVER_FULL_IMAGE ?= $(REGISTRY)/$(SERVER_IMAGE_NAME)
 AGENT_FULL_IMAGE ?= $(REGISTRY)/$(AGENT_IMAGE_NAME)
 TEST_CLIENT_FULL_IMAGE ?= $(REGISTRY)/$(TEST_CLIENT_IMAGE_NAME)
 TEST_SERVER_FULL_IMAGE ?= $(REGISTRY)/$(TEST_SERVER_IMAGE_NAME)
+else
+SERVER_FULL_IMAGE ?= $(SERVER_IMAGE_NAME)
+AGENT_FULL_IMAGE ?= $(AGENT_IMAGE_NAME)
+TEST_CLIENT_FULL_IMAGE ?= $(TEST_CLIENT_IMAGE_NAME)
+TEST_SERVER_FULL_IMAGE ?= $(TEST_SERVER_IMAGE_NAME)
+endif
 
 TAG ?= $(shell git rev-parse HEAD)
 
@@ -306,6 +312,10 @@ docker-push-manifest/proxy-server: ## Push the fat manifest docker image.
 .PHONY: release-staging
 release-staging: ## Builds and push container images to the staging bucket.
 	REGISTRY=$(STAGING_REGISTRY) $(MAKE) docker-push-all release-alias-tag
+
+.PHONY: release-jkh
+release-jkh: ## DO NOT SUBMIT
+	REGISTRY="gcr.io/jkh-gke-dev" $(MAKE) docker-push-all release-alias-tag
 
 .PHONY: release-alias-tag
 release-alias-tag: # Adds the tag to the last build tag. BASE_REF comes from the cloudbuild.yaml
