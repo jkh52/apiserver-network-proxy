@@ -152,6 +152,8 @@ type BackendStorage interface {
 	AddBackend(keys []string, backend Backend) int
 	// RemoveBackend removes a backend, and returns the new number of backends in this storage.
 	RemoveBackend(keys []string, backend Backend) int
+	// SetDraining marks a backend as draining.
+	SetDraining(keys []string, backend Backend)
 	// Backend selects a backend by key.
 	Backend(key string) (Backend, error)
 	// RandomBackend selects a random backend.
@@ -170,6 +172,9 @@ type DefaultBackendStorage struct {
 	backends map[string][]Backend
 	// Cache of backends keys, to efficiently select random.
 	backendKeys []string
+
+	// Agents in draining state are moved from "backends" to here.
+	draining map[string][]Backend
 
 	random *rand.Rand
 }
@@ -232,6 +237,10 @@ func (s *DefaultBackendStorage) RemoveBackend(keys []string, backend Backend) in
 	return len(s.backends)
 }
 
+func (s *DefaultBackendStorage) SetDraining(keys []string, backend Backend) {
+	// DefaultBackendStorage is not draining-aware.
+}
+
 func (s *DefaultBackendStorage) Backend(key string) (Backend, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -261,4 +270,68 @@ func (s *DefaultBackendStorage) NumKeys() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return len(s.backends)
+}
+
+// DrainingBackendStorage is a BackendStorage that is aware of agent
+// draining state and prefers non-draining agents.
+type DrainingBackendStorage struct {
+	// Protects write funcions. In particular, avoid
+	// AddBackend() racing with SetDraining() for a given Backend.
+	mu sync.RWMutex
+
+	primary  *DefaultBackendStorage
+	draining *DefaultBackendStorage
+}
+
+func NewDrainingBackendStorage() *DrainingBackendStorage {
+	return &DrainingBackendStorage{
+		primary:  NewDefaultBackendStorage(),
+		draining: NewDefaultBackendStorage(),
+	}
+}
+
+func (s *DrainingBackendStorage) AddBackend(keys []string, backend Backend) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.primary.AddBackend(keys, backend)
+}
+
+func (s *DrainingBackendStorage) RemoveBackend(keys []string, backend Backend) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	p := s.primary.RemoveBackend(keys, backend)
+	d := s.draining.RemoveBackend(keys, backend)
+	return p + d
+}
+
+func (s *DrainingBackendStorage) SetDraining(keys []string, backend Backend) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.primary.RemoveBackend(keys, backend)
+	s.draining.AddBackend(keys, backend)
+}
+
+func (s *DrainingBackendStorage) Backend(key string) (Backend, error) {
+	b, e := s.primary.Backend(key)
+	if _, ok := e.(*ErrNotFound); ok {
+		return s.draining.Backend(key)
+	}
+	return b, e
+}
+
+func (s *DrainingBackendStorage) RandomBackend() (Backend, error) {
+	b, e := s.primary.RandomBackend()
+	if _, ok := e.(*ErrNotFound); ok {
+		return s.draining.RandomBackend()
+	}
+	return b, e
+}
+
+func (s *DrainingBackendStorage) NumKeys() int {
+	p := s.primary.NumKeys()
+	d := s.draining.NumKeys()
+	return p + d
 }

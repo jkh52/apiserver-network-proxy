@@ -95,6 +95,8 @@ type BackendManager interface {
 	AddBackend(backend Backend)
 	// RemoveBackend adds a backend.
 	RemoveBackend(backend Backend)
+	// SetDraining marks a backend as draining.
+	SetDraining(backend Backend)
 	// NumBackends returns the number of backends.
 	NumBackends() int
 	ReadinessManager
@@ -118,9 +120,9 @@ func NewDefaultBackendManager(proxyStrategies []ProxyStrategy) *DefaultBackendMa
 	metrics.Metrics.SetBackendCount(0)
 	return &DefaultBackendManager{
 		proxyStrategies: proxyStrategies,
-		all:             NewDefaultBackendStorage(),
-		byHost:          NewDefaultBackendStorage(),
-		byDefaultRoute:  NewDefaultBackendStorage(),
+		all:             NewDrainingBackendStorage(),
+		byHost:          NewDrainingBackendStorage(),
+		byDefaultRoute:  NewDrainingBackendStorage(),
 	}
 }
 
@@ -180,6 +182,20 @@ func (s *DefaultBackendManager) RemoveBackend(backend Backend) {
 		}
 	}
 	metrics.Metrics.SetBackendCount(count)
+}
+
+func (s *DefaultBackendManager) SetDraining(backend Backend) {
+	agentID := backend.GetAgentID()
+	s.all.SetDraining([]string{agentID}, backend)
+	if slices.Contains(s.proxyStrategies, ProxyStrategyDestHost) {
+		idents := hostIdentifiers(backend)
+		s.byHost.SetDraining(idents, backend)
+	}
+	if slices.Contains(s.proxyStrategies, ProxyStrategyDefaultRoute) {
+		if backend.GetAgentIdentifiers().DefaultRoute {
+			s.byDefaultRoute.SetDraining([]string{agentID}, backend)
+		}
+	}
 }
 
 func (s *DefaultBackendManager) NumBackends() int {
