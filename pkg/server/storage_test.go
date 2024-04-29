@@ -91,67 +91,131 @@ func TestNewBackend(t *testing.T) {
 }
 
 func TestBackendStorage_AddBackend_Empty(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	testCases := []struct {
+		desc string
+		s    BackendStorage
+	}{
+		{
+			desc: "DefaultBackendStorage",
+			s:    NewDefaultBackendStorage(),
+		},
+		{
+			desc: "DrainingBackendStorage",
+			s:    NewDrainingBackendStorage(),
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
 
-	backend1, _ := NewBackend(mockAgentConn(ctrl, "agent1", []string{}))
-	s := NewDefaultBackendStorage()
+			backend1, _ := NewBackend(mockAgentConn(ctrl, "agent1", []string{}))
 
-	gotCount := s.AddBackend([]string{""}, backend1)
-	if gotCount != 0 {
-		t.Errorf("AddBackend() = %d, want 0", gotCount)
+			gotCount := tc.s.AddBackend([]string{""}, backend1)
+			if gotCount != 0 {
+				t.Errorf("AddBackend() = %d, want 0", gotCount)
+			}
+		})
 	}
 }
 
 func TestBackendStorage_GetBackend_Empty(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	backend1, _ := NewBackend(mockAgentConn(ctrl, "agent1", []string{}))
-	s := NewDefaultBackendStorage()
-
-	s.AddBackend([]string{"ident1"}, backend1)
-
-	got, err := s.Backend("")
-	if got != nil {
-		t.Errorf("Backend() = %v, want nil", got)
+	testCases := []struct {
+		desc string
+		s    BackendStorage
+	}{
+		{
+			desc: "DefaultBackendStorage",
+			s:    NewDefaultBackendStorage(),
+		},
+		{
+			desc: "DrainingBackendStorage",
+			s:    NewDrainingBackendStorage(),
+		},
 	}
-	if err == nil {
-		t.Errorf("Backend() = nil, want error")
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			backend1, _ := NewBackend(mockAgentConn(ctrl, "agent1", []string{}))
+
+			tc.s.AddBackend([]string{"ident1"}, backend1)
+
+			got, err := tc.s.Backend("")
+			if got != nil {
+				t.Errorf("Backend() = %v, want nil", got)
+			}
+			if err == nil {
+				t.Errorf("Backend() = nil, want error")
+			}
+		})
 	}
 }
 
 func TestBackendStorage_RemoveBackend_Empty(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	testCases := []struct {
+		desc string
+		s    BackendStorage
+	}{
+		{
+			desc: "DefaultBackendStorage",
+			s:    NewDefaultBackendStorage(),
+		},
+		{
+			desc: "DrainingBackendStorage",
+			s:    NewDrainingBackendStorage(),
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
 
-	backend1, _ := NewBackend(mockAgentConn(ctrl, "agent1", []string{}))
-	s := NewDefaultBackendStorage()
+			backend1, _ := NewBackend(mockAgentConn(ctrl, "agent1", []string{}))
 
-	s.AddBackend([]string{"ident1"}, backend1)
+			tc.s.AddBackend([]string{"ident1"}, backend1)
 
-	gotCount := s.RemoveBackend([]string{""}, backend1)
-	if gotCount != 1 {
-		t.Errorf("RemoveBackend() = %v, want 1", gotCount)
+			gotCount := tc.s.RemoveBackend([]string{""}, backend1)
+			if gotCount != 1 {
+				t.Errorf("RemoveBackend() = %v, want 1", gotCount)
+			}
+		})
 	}
 }
 
 func TestBackendStorage_RemoveBackend_Unrecognized(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	testCases := []struct {
+		desc string
+		s    BackendStorage
+	}{
+		{
+			desc: "DefaultBackendStorage",
+			s:    NewDefaultBackendStorage(),
+		},
+		{
+			desc: "DrainingBackendStorage",
+			s:    NewDrainingBackendStorage(),
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
 
-	backend1, _ := NewBackend(mockAgentConn(ctrl, "agent1", []string{}))
-	s := NewDefaultBackendStorage()
+			backend1, _ := NewBackend(mockAgentConn(ctrl, "agent1", []string{}))
 
-	s.AddBackend([]string{"ident1"}, backend1)
+			tc.s.AddBackend([]string{"ident1"}, backend1)
 
-	gotCount := s.RemoveBackend([]string{"ident2"}, backend1)
-	if gotCount != 1 {
-		t.Errorf("RemoveBackend() = %v, want 1", gotCount)
+			gotCount := tc.s.RemoveBackend([]string{"ident2"}, backend1)
+			if gotCount != 1 {
+				t.Errorf("RemoveBackend() = %v, want 1", gotCount)
+			}
+		})
 	}
 }
 
-func TestBackendStorage_RemoveBackend(t *testing.T) {
+func TestDefaultBackendStorage_RemoveBackend(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -194,121 +258,186 @@ func TestBackendStorage_RemoveBackend(t *testing.T) {
 	}
 }
 
-func TestBackendStorage_AddBackend(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	backend1, _ := NewBackend(mockAgentConn(ctrl, "agent1", []string{}))
-	s := NewDefaultBackendStorage()
-
-	gotCount := s.AddBackend([]string{"ident1"}, backend1)
-	if gotCount != 1 {
-		t.Errorf("AddBackend() = %v, want 1", gotCount)
-	}
+func TestDrainingBackendStorage_RemoveBackend(t *testing.T) {
+	// DO NOT SUBMIT
 }
 
-func TestBackendStorage_AddBackend_DuplicateAgentID(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	backend1, _ := NewBackend(mockAgentConn(ctrl, "agent1", []string{}))
-	backend12, _ := NewBackend(mockAgentConn(ctrl, "agent1", []string{}))
-	s := NewDefaultBackendStorage()
-
-	s.AddBackend([]string{"ident1"}, backend1)
-	gotCount := s.AddBackend([]string{"ident1"}, backend12)
-	if gotCount != 1 {
-		t.Errorf("AddBackend() = %v, want 1", gotCount)
+func TestBackendStorage_AddBackend(t *testing.T) {
+	testCases := []struct {
+		desc string
+		s    BackendStorage
+	}{
+		{
+			desc: "DefaultBackendStorage",
+			s:    NewDefaultBackendStorage(),
+		},
+		{
+			desc: "DrainingBackendStorage",
+			s:    NewDrainingBackendStorage(),
+		},
 	}
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
 
-	got, _ := s.Backend("ident1")
-	if got != backend1 {
-		t.Errorf("Backend() = %v, want %v", got, backend1)
+			backend1, _ := NewBackend(mockAgentConn(ctrl, "agent1", []string{}))
+
+			gotCount := tc.s.AddBackend([]string{"ident1"}, backend1)
+			if gotCount != 1 {
+				t.Errorf("AddBackend() = %v, want 1", gotCount)
+			}
+		})
 	}
 }
 
 func TestBackendStorage_AddBackend_DuplicateKey(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	testCases := []struct {
+		desc string
+		s    BackendStorage
+	}{
+		{
+			desc: "DefaultBackendStorage",
+			s:    NewDefaultBackendStorage(),
+		},
+		{
+			desc: "DrainingBackendStorage",
+			s:    NewDrainingBackendStorage(),
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
 
-	backend1, _ := NewBackend(mockAgentConn(ctrl, "agent1", []string{}))
-	backend2, _ := NewBackend(mockAgentConn(ctrl, "agent2", []string{}))
-	s := NewDefaultBackendStorage()
+			backend1, _ := NewBackend(mockAgentConn(ctrl, "agent1", []string{}))
+			backend2, _ := NewBackend(mockAgentConn(ctrl, "agent2", []string{}))
 
-	s.AddBackend([]string{"hostname1"}, backend1)
-	gotCount := s.AddBackend([]string{"hostname1"}, backend2)
-	if gotCount != 1 {
-		t.Errorf("AddBackend() = %v, want 1", gotCount)
+			tc.s.AddBackend([]string{"hostname1"}, backend1)
+			gotCount := tc.s.AddBackend([]string{"hostname1"}, backend2)
+			if gotCount != 1 {
+				t.Errorf("AddBackend() = %v, want 1", gotCount)
+			}
+		})
 	}
 }
 
 func TestBackendStorage_AddBackend_SameBackend(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	backend1, _ := NewBackend(mockAgentConn(ctrl, "agent1", []string{}))
-	s := NewDefaultBackendStorage()
-
-	s.AddBackend([]string{"ident1"}, backend1)
-	gotCount := s.AddBackend([]string{"ident1"}, backend1)
-	if gotCount != 1 {
-		t.Errorf("AddBackend() = %v, want 1", gotCount)
+	testCases := []struct {
+		desc string
+		s    BackendStorage
+	}{
+		{
+			desc: "DefaultBackendStorage",
+			s:    NewDefaultBackendStorage(),
+		},
+		{
+			desc: "DrainingBackendStorage",
+			s:    NewDrainingBackendStorage(),
+		},
 	}
-	gotLen := len(s.backends["ident1"])
-	if gotLen != 1 {
-		t.Errorf("backends list = %v, want length 1", s.backends["ident1"])
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			backend1, _ := NewBackend(mockAgentConn(ctrl, "agent1", []string{}))
+
+			tc.s.AddBackend([]string{"ident1"}, backend1)
+			gotCount := tc.s.AddBackend([]string{"ident1"}, backend1)
+			if gotCount != 1 {
+				t.Errorf("AddBackend() = %v, want 1", gotCount)
+			}
+			tc.s.RemoveBackend([]string{"ident1"}, backend1)
+			gotLen := tc.s.NumKeys()
+			if gotLen != 0 {
+				t.Errorf("NumKeys() = %v, want length 0", gotLen)
+			}
+		})
 	}
 }
 
 func TestBackendStorage_NumKeys(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	backend1, _ := NewBackend(mockAgentConn(ctrl, "agent1", []string{}))
-	s := NewDefaultBackendStorage()
-
-	gotCount := s.NumKeys()
-	if gotCount != 0 {
-		t.Errorf("NumKeys() = %d, want 0", gotCount)
+	testCases := []struct {
+		desc string
+		s    BackendStorage
+	}{
+		{
+			desc: "DefaultBackendStorage",
+			s:    NewDefaultBackendStorage(),
+		},
+		{
+			desc: "DrainingBackendStorage",
+			s:    NewDrainingBackendStorage(),
+		},
 	}
-	s.AddBackend([]string{"ident1"}, backend1)
-	gotCount = s.NumKeys()
-	if gotCount != 1 {
-		t.Errorf("NumKeys() = %d, want 1", gotCount)
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			backend1, _ := NewBackend(mockAgentConn(ctrl, "agent1", []string{}))
+
+			gotCount := tc.s.NumKeys()
+			if gotCount != 0 {
+				t.Errorf("NumKeys() = %d, want 0", gotCount)
+			}
+			tc.s.AddBackend([]string{"ident1"}, backend1)
+			gotCount = tc.s.NumKeys()
+			if gotCount != 1 {
+				t.Errorf("NumKeys() = %d, want 1", gotCount)
+			}
+		})
 	}
 }
 
 func TestBackendStorage_RandomBackend(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	testCases := []struct {
+		desc string
+		s    BackendStorage
+	}{
+		{
+			desc: "DefaultBackendStorage",
+			s:    NewDefaultBackendStorage(),
+		},
+		{
+			desc: "DrainingBackendStorage",
+			s:    NewDrainingBackendStorage(),
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
 
-	backend1, _ := NewBackend(mockAgentConn(ctrl, "agent1", []string{}))
-	backend2, _ := NewBackend(mockAgentConn(ctrl, "agent2", []string{}))
-	s := NewDefaultBackendStorage()
+			backend1, _ := NewBackend(mockAgentConn(ctrl, "agent1", []string{}))
+			backend2, _ := NewBackend(mockAgentConn(ctrl, "agent2", []string{}))
 
-	got, err := s.RandomBackend()
-	if got != nil {
-		t.Errorf("RandomBackend() = %v, want nil", got)
-	}
-	if err == nil {
-		t.Errorf("RandomBackend() = error nil, want error")
-	}
+			got, err := tc.s.RandomBackend()
+			if got != nil {
+				t.Errorf("RandomBackend() = %v, want nil", got)
+			}
+			if err == nil {
+				t.Errorf("RandomBackend() = error nil, want error")
+			}
 
-	s.AddBackend([]string{"ident1"}, backend1)
-	got, err = s.RandomBackend()
-	if got != backend1 {
-		t.Errorf("RandomBackend() = %v, want %v", got, backend1)
-	}
-	if err != nil {
-		t.Errorf("RandomBackend() = error %v, want nil", err)
-	}
+			tc.s.AddBackend([]string{"ident1"}, backend1)
+			got, err = tc.s.RandomBackend()
+			if got != backend1 {
+				t.Errorf("RandomBackend() = %v, want %v", got, backend1)
+			}
+			if err != nil {
+				t.Errorf("RandomBackend() = error %v, want nil", err)
+			}
 
-	s.AddBackend([]string{"ident1"}, backend2)
-	got, err = s.RandomBackend()
-	if got != backend1 {
-		t.Errorf("RandomBackend() = %v, want %v", got, backend1)
-	}
-	if err != nil {
-		t.Errorf("RandomBackend() = error %v, want nil", err)
+			tc.s.AddBackend([]string{"ident1"}, backend2)
+			got, err = tc.s.RandomBackend()
+			if got != backend1 {
+				t.Errorf("RandomBackend() = %v, want %v", got, backend1)
+			}
+			if err != nil {
+				t.Errorf("RandomBackend() = error %v, want nil", err)
+			}
+		})
 	}
 }

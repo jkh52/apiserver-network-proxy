@@ -237,9 +237,8 @@ func (s *DefaultBackendStorage) RemoveBackend(keys []string, backend Backend) in
 	return len(s.backends)
 }
 
-func (s *DefaultBackendStorage) SetDraining(keys []string, backend Backend) {
-	// DefaultBackendStorage is not draining-aware.
-}
+// DefaultBackendStorage is not draining-aware.
+func (s *DefaultBackendStorage) SetDraining(keys []string, backend Backend) {}
 
 func (s *DefaultBackendStorage) Backend(key string) (Backend, error) {
 	s.mu.Lock()
