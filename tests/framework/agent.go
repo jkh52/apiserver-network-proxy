@@ -237,6 +237,7 @@ func agentOptions(t testing.TB, opts AgentOpts) (*agentopts.GrpcProxyAgentOption
 	if err != nil {
 		return nil, err
 	}
+	o.AllowEphemeralPorts = true
 	o.HealthServerPort = ports[0]
 	o.AdminServerPort = ports[1]
 

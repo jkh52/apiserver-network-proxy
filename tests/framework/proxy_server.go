@@ -143,7 +143,7 @@ func serverOptions(t testing.TB, opts ProxyServerOpts) (*serveropts.ProxyRunOpti
 	o.Mode = opts.Mode
 
 	uid := uuid.New().String()
-	o.UdsName = filepath.Join(CertsDir, fmt.Sprintf("server-%s.sock", uid))
+	o.UdsName = filepath.Join(CertsDir, fmt.Sprintf("server-%s.sock", uid[24:]))
 	o.ServerPort = 0 // Required for UDS
 
 	o.ClusterCert = filepath.Join(CertsDir, TestServerCertFile)
@@ -159,6 +159,7 @@ func serverOptions(t testing.TB, opts ProxyServerOpts) (*serveropts.ProxyRunOpti
 	if err != nil {
 		return nil, err
 	}
+	o.AllowEphemeralPorts = true
 	if opts.AgentPort != 0 {
 		o.AgentPort = opts.AgentPort
 	} else {

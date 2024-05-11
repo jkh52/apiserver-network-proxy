@@ -58,6 +58,8 @@ type GrpcProxyAgentOptions struct {
 	// If EnableProfiling is true, this enables the lock contention
 	// profiling at host:adminPort/debug/pprof/block.
 	EnableContentionProfiling bool
+	// If AllowEphemeralPorts is true, servers are allowed to listen on ephemeral port range.
+	AllowEphemeralPorts bool
 
 	AgentID          string
 	AgentIdentifiers string

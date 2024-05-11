@@ -69,7 +69,8 @@ type ProxyRunOptions struct {
 	// If EnableProfiling is true, this enables the lock contention
 	// profiling at host:AdminPort/debug/pprof/block.
 	EnableContentionProfiling bool
-
+	// If AllowEphemeralPorts is true, servers are allowed to listen on ephemeral port range.
+	AllowEphemeralPorts bool
 	// ID of this proxy server.
 	ServerID string
 	// Number of proxy server instances, should be 1 unless it is a HA proxy server.
@@ -237,17 +238,19 @@ func (o *ProxyRunOptions) Validate() error {
 			return fmt.Errorf("server ca cert should not be set for UDS")
 		}
 	}
-	if o.ServerPort > 49151 {
-		return fmt.Errorf("please do not try to use ephemeral port %d for the server port", o.ServerPort)
-	}
-	if o.AgentPort > 49151 {
-		return fmt.Errorf("please do not try to use ephemeral port %d for the agent port", o.AgentPort)
-	}
-	if o.AdminPort > 49151 {
-		return fmt.Errorf("please do not try to use ephemeral port %d for the admin port", o.AdminPort)
-	}
-	if o.HealthPort > 49151 {
-		return fmt.Errorf("please do not try to use ephemeral port %d for the health port", o.HealthPort)
+	if !o.AllowEphemeralPorts {
+		if o.ServerPort > 49151 {
+			return fmt.Errorf("please do not try to use ephemeral port %d for the server port", o.ServerPort)
+		}
+		if o.AgentPort > 49151 {
+			return fmt.Errorf("please do not try to use ephemeral port %d for the agent port", o.AgentPort)
+		}
+		if o.AdminPort > 49151 {
+			return fmt.Errorf("please do not try to use ephemeral port %d for the admin port", o.AdminPort)
+		}
+		if o.HealthPort > 49151 {
+			return fmt.Errorf("please do not try to use ephemeral port %d for the health port", o.HealthPort)
+		}
 	}
 
 	if o.ServerPort < 1024 {
